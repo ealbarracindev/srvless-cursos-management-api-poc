@@ -1,0 +1,55 @@
+---
+swagger: "2.0"
+info:
+  version: "1.0"
+  title: "apps-dev-cursos-api-gateway"
+host: "cdjl5u7ah8.execute-api.us-east-1.amazonaws.com"
+basePath: "/dev"
+schemes:
+- "https"
+paths:
+  /cursos:
+    post:
+      summary: "Crear un curso"
+      x-amazon-apigateway-integration:
+        uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CreateCursoFunction.Arn}/invocations
+        httpMethod: POST
+        type: aws_proxy      
+    get:
+      summary: "Listar cursos"
+      x-amazon-apigateway-integration:
+        uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions:${ListCursosFunction.Arn}/invocations
+        httpMethod: POST
+        type: aws_proxy
+      responses: {}
+  # /cursos/{cursoId}:
+  #   get:
+  #     summary: "Obtener un curso"
+  #     x-amazon-apigateway-integration:
+  #       uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetCursoFunction.Arn}/invocations
+  #       httpMethod: POST
+  #       type: aws_proxy
+    # put:
+    #   responses: {}
+  /swagger-ui:
+    get:
+      summary: "Interfaz de Swagger UI"
+      description: "Devuelve el HTML de Swagger UI para visualizar la documentación"
+      responses:
+        "200":
+          description: "Página de Swagger UI"
+      x-amazon-apigateway-integration:
+        uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SwaggerUIFunction.Arn}/invocations
+        httpMethod: POST
+        type: aws_proxy
+  /docs:
+    get:
+      summary: "Obtener la documentación Swagger de la API"
+      description: "Devuelve el archivo Swagger en formato JSON"
+      responses:
+        "200":
+          description: "Swagger obtenido correctamente"
+      x-amazon-apigateway-integration:
+        uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SwaggerFunction.Arn}/invocations
+        httpMethod: POST
+        type: aws_proxy

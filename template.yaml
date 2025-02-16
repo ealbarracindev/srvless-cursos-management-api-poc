@@ -1,0 +1,284 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >-
+  Esta API es para la gestion de cursos con envio de notificaciones personalizadas
+
+Parameters:
+  pAccount:
+    Type: String
+    Description: AWS Account
+    Default: apps
+  pEnvironment:
+    Type: String
+    Description: Prefix of the current environment
+    AllowedValues:
+      - dev
+      - tst
+      - prod
+    Default: dev
+  pLambdaName:
+    Type: String
+    Description: Prefix of the current lambda name      
+  pPyVersion:
+    Type: String
+    Description: Version de python utilizada
+    AllowedValues:
+      - 'python3.10'
+      - 'python3.12'
+    Default: 'python3.12'
+  pBuildVersion:
+    Type: String
+    Description: "Numero de version del proyecto."
+    Default: "1.0.0"
+  pSlackWebhookURL:
+    Type: String
+    Description: "Slack Webhook URL"
+    Default: "https://hooks.slack.com/services/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"
+  pTeamsWebhookURL:
+    Type: String
+    Description: "Teams Webhook URL"
+    Default: "https://bancosupervielle.webhook.office.com/webhookb2/f144b711-9787-4cf8-9cf7-623d9fd64125@e9d72534-ad36-4657-bc30-46bd7f6add1a/IncomingWebhook/ef48f348fb004dd293d044048f6cc75a/2718ea52-abef-430a-a7f6-bab5127cc919/V2XDq6glAzSk4Ug3uSbQcQbL-AwOl7WaMa0CJSUwYFFL41"
+  # pJWTSecretKey:
+  #   Type: String
+  #   Description: Clave para la generacion de tokens
+
+Globals:
+  Function:
+    Runtime: !Ref pPyVersion
+    #Handler: handlers.<handler_name>.handler
+    Timeout: 10
+    MemorySize: 128
+    Environment:
+      Variables:
+        DYNAMODB_TABLE: !Ref CursosTable
+        SLACK_WEBHOOK_URL: !Ref pSlackWebhookURL
+        TEAMS_WEBHOOK_URL: !Ref pTeamsWebhookURL
+    
+        
+Resources:
+############################################################################################
+  # Table to store courses
+  CursosTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${pAccount}-${pEnvironment}-${pLambdaName}-db"
+      AttributeDefinitions:
+        - AttributeName: cursoId
+          AttributeType: S
+        - AttributeName: titulo
+          AttributeType: S
+        - AttributeName: instructor
+          AttributeType: S
+      KeySchema:
+        - AttributeName: cursoId
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+      GlobalSecondaryIndexes:
+        - IndexName: titulo-instructor-index
+          KeySchema:
+            - AttributeName: titulo
+              KeyType: HASH
+            - AttributeName: instructor
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+############################################################################################
+  # # LogGroup
+  # LambdaLogGroup:
+  #   Type: AWS::Logs::LogGroup
+  #   Properties:
+  #     LogGroupName: !Sub "/aws/lambda/${pAccount}-${pEnvironment}-${pAppName}-log-group"
+  #     RetentionInDays: 7
+  ############################################################################################
+  ### INICIO SEG
+  # AuthLambdaRole:
+  #     Type: "AWS::IAM::Role"
+  #     Properties:
+  #         RoleName: !Join ["-", [!Ref pAccount, !Ref pEnvironment, !Ref pLambdaName, "auth-role"]]
+  #         AssumeRolePolicyDocument:
+  #             Version: "2012-10-17"
+  #             Statement:
+  #                 - Effect: "Allow"
+  #                   Principal:
+  #                       Service:
+  #                           - "lambda.amazonaws.com"
+  #                   Action:
+  #                       - "sts:AssumeRole"
+  #         Path: "/"
+  #         ManagedPolicyArns:
+  #             - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+  ############################################################################################
+  CommonLambdaRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: !Sub "${pAccount}-${pEnvironment}-${pLambdaName}-common-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+        - !Ref DynamoDBAccessPolicy      
+  ############################################################################################
+  DynamoDBAccessPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "${pAccount}-${pEnvironment}-dynamodb-access-policy"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Action:
+              - dynamodb:GetItem
+              - dynamodb:PutItem
+              - dynamodb:UpdateItem
+              - dynamodb:DeleteItem
+              - dynamodb:Query
+              - dynamodb:Scan
+            Resource:
+              - !GetAtt CursosTable.Arn
+              - !Sub "${CursosTable.Arn}/index/titulo-instructor-index" 
+  ############################################################################################
+  # API GateWay
+  CursosApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub '${pAccount}-${pEnvironment}-cursos-api-gateway'
+      StageName: !Ref pEnvironment
+      #DefinitionUri: ./swagger-cursos-api.yaml
+  ############################################################################################
+  SwaggerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${pAccount}-${pEnvironment}-swagger-docs"
+      CodeUri: .
+      Handler: src.swagger_handler.lambda_handler
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref CursosApi
+            Path: /docs
+            Method: get
+      PackageType: Zip
+    Metadata:
+      BuildMethod: !Ref pPyVersion
+      Files:
+        - swagger-cursos-api.yaml
+  ############################################################################################
+  SwaggerUIFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${pAccount}-${pEnvironment}-swagger-ui"
+      CodeUri: .
+      Handler: src.swagger_ui_handler.lambda_handler
+      Role: !GetAtt CommonLambdaRole.Arn
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref CursosApi
+            Path: /swagger-ui
+            Method: get
+  ############################################################################################
+  ListCursoFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${pAccount}-${pEnvironment}-get-cursos' 
+      CodeUri: .
+      Handler: src.course_get_list.handler
+      Role: !GetAtt CommonLambdaRole.Arn
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref CursosApi
+            Path: /cursos
+            Method: get
+  ############################################################################################
+  GetCursoFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${pAccount}-${pEnvironment}-get-curso'
+      CodeUri: .
+      Handler: src.course_get.handler
+      Role: !GetAtt CommonLambdaRole.Arn     
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref CursosApi
+            Path: /cursos/{cursoId}
+            Method: get
+  ############################################################################################
+  AddCursoFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${pAccount}-${pEnvironment}-create-curso'
+      CodeUri: .
+      Handler: src.course_create.handler
+      Role: !GetAtt CommonLambdaRole.Arn
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref CursosApi
+            Path: /cursos
+            Method: post
+  ############################################################################################
+  UpdateCursoFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${pAccount}-${pEnvironment}-update-curso'
+      CodeUri: .
+      Handler: src.course_update.handler
+      Role: !GetAtt CommonLambdaRole.Arn
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref CursosApi
+            Path: /cursos/{cursoId}
+            Method: put
+  ############################################################################################
+  DeleteCursoFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${pAccount}-${pEnvironment}-delete-curso'
+      CodeUri: .
+      Handler: src.delete_course.handler
+      Role: !GetAtt CommonLambdaRole.Arn
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref CursosApi
+            Path: /cursos/{cursoId}
+            Method: delete
+  ############################################################################################
+  ChangeCourseStateFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${pAccount}-${pEnvironment}-change-curso-state'
+      CodeUri: .
+      Handler: src.course_change_state.handler
+      Role: !GetAtt CommonLambdaRole.Arn
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref CursosApi
+            Path: /cursos/{cursoId}/estado
+            Method: put
+Outputs:
+  TemplateVersion:
+    Description: "Version del proyecto"
+    Value: !Ref pBuildVersion
+  ApiUrl:
+    Description: "API Gateway de Cursos 2024"
+    Value: !Sub "https://${CursosApi}.execute-api.${AWS::Region}.amazonaws.com/${pEnvironment}/"

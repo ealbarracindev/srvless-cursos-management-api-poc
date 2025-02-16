@@ -1,0 +1,10 @@
+version = 0.1
+
+[default.deploy.parameters]
+stack_name = "srvless-cursos-managment-api-poc"
+s3_bucket = "spv-dev-srvless-deploy"
+s3_prefix = "cursos-api"
+region = "us-east-1"
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = false
+fail_on_empty_changeset = false
