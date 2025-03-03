@@ -2,7 +2,7 @@
 API para la Gestión de Cursos con Estados de Curso y Notificaciones Personalizadas que permiten demostrar una amplia gama de habilidades técnicas, incluyendo la gestión de estados, integración de notificaciones, implementación de seguridad, y uso de diversas herramientas de AWS.
 
 ## Estructura de Carpetas y Archivos
-
+```
 srvless-curso-management-api-poc/
 │
 ├── README.md
@@ -43,7 +43,7 @@ srvless-curso-management-api-poc/
 │
 └── scripts/
     └── deploy.sh                  # Script de despliegue (opcional)
-
+```
 ## Diagrama de Flujo Simplificado
 
 ```

@@ -33,11 +33,11 @@ Parameters:
   pSlackWebhookURL:
     Type: String
     Description: "Slack Webhook URL"
-    Default: "https://hooks.slack.com/services/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"
+    Default: "url_slack"
   pTeamsWebhookURL:
     Type: String
     Description: "Teams Webhook URL"
-    Default: "https://bancosupervielle.webhook.office.com/webhookb2/f144b711-9787-4cf8-9cf7-623d9fd64125@e9d72534-ad36-4657-bc30-46bd7f6add1a/IncomingWebhook/ef48f348fb004dd293d044048f6cc75a/2718ea52-abef-430a-a7f6-bab5127cc919/V2XDq6glAzSk4Ug3uSbQcQbL-AwOl7WaMa0CJSUwYFFL41"
+    Default: "url_teams"
   # pJWTSecretKey:
   #   Type: String
   #   Description: Clave para la generacion de tokens
@@ -280,5 +280,5 @@ Outputs:
     Description: "Version del proyecto"
     Value: !Ref pBuildVersion
   ApiUrl:
-    Description: "API Gateway de Cursos 2024"
+    Description: "API Gateway de Cursos"
     Value: !Sub "https://${CursosApi}.execute-api.${AWS::Region}.amazonaws.com/${pEnvironment}/"
